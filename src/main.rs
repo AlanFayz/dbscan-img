@@ -1,20 +1,13 @@
 use std::{
-    collections::{BTreeSet, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use macroquad::prelude::*;
 
-#[derive(Default, Debug, Copy, Clone)]
-struct Point {
-    pub position: Vec2,
-    pub cluster_id: Option<i32>,
-    pub is_core: bool,
-}
+use crate::dbscan::{Sample, scan};
 
-trait Sample {
-    fn distance_squared(self: &Self, right: &Self) -> f32;
-}
+mod dbscan;
 
 #[derive(Default, Debug, Copy, Clone)]
 struct SamplePoint {
@@ -68,91 +61,32 @@ async fn main() {
             .as_secs(),
     );
 
-    let (min_pts, eps) = (5, 50);
-
     let sample_points = generate_test_data();
-    let mut points: Vec<Point> = sample_points
-        .iter()
-        .map(|p| Point {
-            position: p.position,
-            ..Default::default()
-        })
-        .collect();
+    let points = scan(&sample_points, 5, 100.0);
 
-    for i in 0..sample_points.len() {
-        let mut cnt = 0;
-        for j in 0..sample_points.len() {
-            if i == j {
-                continue;
-            }
-
-            if sample_points[i].distance_squared(&sample_points[j]) <= (eps * eps) as f32 {
-                cnt += 1;
-            }
-        }
-
-        if cnt >= min_pts {
-            points[i].is_core = true;
-        }
-    }
-
-    let mut cluster_id = 1;
-    let mut colors = Vec::new();
+    let mut colors: HashMap<_, Color> = HashMap::new();
     for i in 0..points.len() {
         match points[i].cluster_id {
-            Some(_) => continue,
-            _ => {}
+            Some(i) => _ = colors.entry(i).or_insert(Color::from_hex(rand::rand())),
+            None => {}
         };
-
-        if !points[i].is_core {
-            continue;
-        }
-
-        let mut q: VecDeque<usize> = VecDeque::new();
-        q.push_front(i);
-
-        while !q.is_empty() {
-            let front = q.pop_back().unwrap();
-            points[front].cluster_id = Some(cluster_id);
-
-            if !points[front].is_core {
-                continue;
-            }
-
-            for j in 0..points.len() {
-                match points[j].cluster_id {
-                    Some(_) => continue,
-                    _ => {}
-                };
-
-                let (l, r) = points.split_at_mut(j.max(front));
-
-                let p0 = &mut l[j.min(front)];
-                let p1 = &mut r[0];
-
-                if !q.contains(&j)
-                    && p0.position.distance_squared(p1.position) <= (eps * eps) as f32
-                {
-                    q.push_front(j);
-                }
-            }
-        }
-
-        println!("Finished with {}", cluster_id);
-        cluster_id += 1;
-        colors.push(Color::from_hex(rand::rand()));
     }
 
     loop {
         clear_background(WHITE);
 
-        for (_, point) in sample_points.iter().zip(points.iter()) {
-            let color = match point.cluster_id {
-                Some(i) => colors[i as usize - 1],
-                _ => BLACK,
-            };
+        for (sample_point, point) in sample_points.iter().zip(points.iter()) {
+            let color = point
+                .cluster_id
+                .map(|i| colors.get(&i).unwrap().clone())
+                .unwrap_or(BLACK);
 
-            draw_circle(point.position.x, point.position.y, 10.0, color);
+            draw_circle(
+                sample_point.position.x,
+                sample_point.position.y,
+                10.0,
+                color,
+            );
         }
 
         next_frame().await
