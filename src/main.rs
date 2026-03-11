@@ -1,13 +1,14 @@
 use std::{
-    collections::{BTreeSet, HashMap, HashSet, VecDeque},
-    time::{SystemTime, UNIX_EPOCH},
+    collections::HashMap,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use macroquad::prelude::*;
 
-use crate::dbscan::{Sample, scan};
+use crate::{dbscan::{Sample, scan}, spatial_hash::Spatial};
 
 mod dbscan;
+mod spatial_hash;
 
 #[derive(Default, Debug, Copy, Clone)]
 struct SamplePoint {
@@ -20,6 +21,12 @@ impl Sample for SamplePoint {
     }
 }
 
+impl Spatial<2> for SamplePoint {
+    fn position(self: &Self) -> [f32; 2] {
+        self.position.into()
+    }
+}
+
 fn generate_test_data() -> Vec<SamplePoint> {
     let mut points = Vec::new();
     let center_x = screen_width() / 2.0;
@@ -27,7 +34,7 @@ fn generate_test_data() -> Vec<SamplePoint> {
 
     let gap = 100.0;
 
-    for _ in 0..50 {
+    for _ in 0..500_000 {
         points.push(SamplePoint {
             position: vec2(
                 rand::gen_range(10.0, center_x - gap),
@@ -36,7 +43,7 @@ fn generate_test_data() -> Vec<SamplePoint> {
         });
     }
 
-    for _ in 0..50 {
+    for _ in 0..500_000 {
         points.push(SamplePoint {
             position: vec2(
                 rand::gen_range(center_x + gap, screen_width() - 10.0),
@@ -62,33 +69,32 @@ async fn main() {
     );
 
     let sample_points = generate_test_data();
-    let points = scan(&sample_points, 5, 100.0);
 
-    let mut colors: HashMap<_, Color> = HashMap::new();
-    for i in 0..points.len() {
-        match points[i].cluster_id {
-            Some(i) => _ = colors.entry(i).or_insert(Color::from_hex(rand::rand())),
-            None => {}
-        };
-    }
+    println!("Starting scanning now");
+    let start = Instant::now();
+    let _ = scan(&sample_points, 5, 10.0);
+    println!("Scanning took {}s", start.elapsed().as_secs_f64());
 
-    loop {
-        clear_background(WHITE);
+    // let mut colors: HashMap<_, Color> = HashMap::new();
+    // for i in 0..points.len() {
+    //     match points[i].cluster_id {
+    //         Some(i) => _ = colors.entry(i).or_insert(Color::from_hex(rand::rand())),
+    //         None => {}
+    //     };
+    // }
 
-        for (sample_point, point) in sample_points.iter().zip(points.iter()) {
-            let color = point
-                .cluster_id
-                .map(|i| colors.get(&i).unwrap().clone())
-                .unwrap_or(BLACK);
+    // loop {
+    //     clear_background(WHITE);
 
-            draw_circle(
-                sample_point.position.x,
-                sample_point.position.y,
-                10.0,
-                color,
-            );
-        }
+    //     for (sample_point, point) in sample_points.iter().zip(points.iter()) {
+    //         let color = point
+    //             .cluster_id
+    //             .map(|i| colors.get(&i).unwrap().clone())
+    //             .unwrap_or(BLACK);
 
-        next_frame().await
-    }
+    //         draw_circle(sample_point.position.x, sample_point.position.y, 5.0, color);
+    //     }
+
+    //     next_frame().await
+    // }
 }
