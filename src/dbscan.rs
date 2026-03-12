@@ -1,4 +1,3 @@
-
 use macroquad::prelude::*;
 
 use crate::spatial_hash::{Spatial, SpatialHash};
@@ -25,9 +24,7 @@ pub fn scan<const N: usize, T: Sample + Spatial<N> + Clone>(
     }
 
     for i in 0..sample_points.len() {
-        let nearby_points = grid.query(&sample_points[i]);
-        let cnt = nearby_points.count();
-        if cnt >= min_pts as usize {
+        if grid.query(&sample_points[i]).take(min_pts as usize).count() == min_pts as usize {
             points[i].is_core = true;
         }
     }

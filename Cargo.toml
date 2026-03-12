@@ -5,3 +5,10 @@ edition = "2024"
 
 [dependencies]
 macroquad = "0.4.14"
+palette = "0.7.6"
+rustc-hash = "2.1.1"
+
+[profile.profiling]
+inherits = "release"
+debug = true       # Essential for function names and line numbers
+lto = false

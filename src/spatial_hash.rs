@@ -1,18 +1,18 @@
-use std::collections::BTreeMap;
+use rustc_hash::FxHashMap;
 
 pub trait Spatial<const N: usize> {
     fn position(self: &Self) -> [f32; N];
 }
 
 pub struct SpatialHash<const N: usize, T: Spatial<N> + Clone> {
-    grid: BTreeMap<[i64; N], Vec<(T, usize)>>,
+    grid: FxHashMap<[i64; N], Vec<(T, usize)>>,
     cell_size: i64,
 }
 
 impl<const N: usize, T: Spatial<N> + Clone> SpatialHash<N, T> {
     pub fn new(cell_size: i64) -> Self {
         Self {
-            grid: BTreeMap::new(),
+            grid: FxHashMap::default(),
             cell_size,
         }
     }
@@ -55,6 +55,6 @@ impl<const N: usize, T: Spatial<N> + Clone> SpatialHash<N, T> {
 
                 self.grid.get(&target)
             })
-            .flatten() 
+            .flatten()
     }
 }

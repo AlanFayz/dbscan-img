@@ -4,6 +4,7 @@ use std::{
 };
 
 use macroquad::prelude::*;
+use palette::{FromColor, Lab, Srgb};
 
 use crate::{
     dbscan::{Sample, scan},
@@ -30,14 +31,31 @@ impl Sample for SamplePoint {
     }
 }
 
+const COLOR_FACTOR: f32 = 500.0;
+
+fn rgb_to_pixel_lab(color: Color) -> [f32; 3] {
+    let rgb = Srgb::new(color.r, color.g, color.b);
+    let lab = Lab::from_color(rgb);
+
+    // l: 0.0 -> 1.0
+    // a, b: 0.0 -> 2.0
+    [
+        lab.l / 100.0,
+        (lab.a + 128.0) / 128.0,
+        (lab.b + 128.0) / 128.0,
+    ]
+}
+
 impl Sample for ImagePoint {
     fn distance_squared(&self, right: &Self) -> f32 {
         let dx = self.position.x - right.position.x;
         let dy = self.position.y - right.position.y;
 
-        let dr = (self.color.r - right.color.r) * (screen_width());
-        let dg = (self.color.g - right.color.g) * (screen_height());
-        let db = (self.color.b - right.color.b) * (screen_width());
+        let (col0, col1) = (rgb_to_pixel_lab(self.color), rgb_to_pixel_lab(right.color));
+
+        let dr = (col0[0] - col1[0]) * COLOR_FACTOR;
+        let dg = (col0[1] - col1[1]) * COLOR_FACTOR;
+        let db = (col0[2] - col1[2]) * COLOR_FACTOR;
 
         return (dx * dx) + (dy * dy) + (dr * dr) + (dg * dg) + (db * db);
     }
@@ -51,12 +69,13 @@ impl Spatial<2> for SamplePoint {
 
 impl Spatial<5> for ImagePoint {
     fn position(self: &Self) -> [f32; 5] {
+        let col = rgb_to_pixel_lab(self.color);
         [
             self.position.x,
             self.position.y,
-            self.color.r * screen_width(),
-            self.color.g * screen_height(),
-            self.color.b * screen_width(),
+            col[0] * COLOR_FACTOR,
+            col[1] * COLOR_FACTOR,
+            col[2] * COLOR_FACTOR,
         ]
     }
 }
@@ -78,7 +97,7 @@ async fn generate_image_data() -> Vec<ImagePoint> {
     return points;
 }
 
-fn generate_test_data() -> Vec<SamplePoint> {
+fn _generate_test_data() -> Vec<SamplePoint> {
     let mut points = Vec::new();
     let center_x = screen_width() / 2.0;
     let center_y = screen_height() / 2.0;
@@ -110,7 +129,16 @@ fn generate_test_data() -> Vec<SamplePoint> {
     return points;
 }
 
-#[macroquad::main("MyGame")]
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "dbscan".to_owned(),
+        window_width: 1600,
+        window_height: 900,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     rand::srand(
         SystemTime::now()
@@ -122,7 +150,7 @@ async fn main() {
     let sample_points = generate_image_data().await;
 
     let time = Instant::now();
-    let points = scan(&sample_points, 10, 15.0);
+    let points = scan(&sample_points, 12, 10.0);
     println!("{}s", time.elapsed().as_secs_f64());
 
     let mut colors: HashMap<_, Color> = HashMap::new();
