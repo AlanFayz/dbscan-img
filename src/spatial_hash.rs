@@ -1,4 +1,4 @@
-use std::{array, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 pub trait Spatial<const N: usize> {
     fn position(self: &Self) -> [f32; N];
@@ -23,7 +23,7 @@ impl<const N: usize, T: Spatial<N> + Clone> SpatialHash<N, T> {
         list.push((item, idx));
     }
 
-    pub fn remove(self: &mut Self, item: &T) {
+    pub fn _remove(self: &mut Self, item: &T) {
         let position = item.position().map(|x| x as i64 / self.cell_size);
         let list = &mut self.grid.entry(position).or_insert(Vec::new());
         let idx = list
@@ -37,33 +37,24 @@ impl<const N: usize, T: Spatial<N> + Clone> SpatialHash<N, T> {
         };
     }
 
-    pub fn query(self: &Self, item: &T) -> Vec<(T, usize)> {
-        return self.query_recursive(item, [0; N], 0);
-    }
+    pub fn query<'a>(&'a self, item: &T) -> impl Iterator<Item = &'a (T, usize)> + 'a {
+        let base = item.position();
+        let cell_size = self.cell_size as i64;
 
-    fn query_recursive(
-        self: &Self,
-        item: &T,
-        mut offsets: [i64; N],
-        depth: usize,
-    ) -> Vec<(T, usize)> {
-        if depth >= N {
-            let base = item.position();
-            let position: [i64; N] =
-                array::from_fn(|i| (base[i] as i64 / self.cell_size) + offsets[i]);
+        let center: [i64; N] = std::array::from_fn(|i| base[i] as i64 / cell_size);
 
-            return match self.grid.get(&position) {
-                Some(val) => val.iter().cloned().collect(),
-                None => Vec::new(),
-            };
-        }
+        (0..3i64.pow(N as u32))
+            .filter_map(move |i| {
+                let mut target = center;
+                let mut k = i;
 
-        let mut result = Vec::new();
-        for i in -1..2 {
-            offsets[depth] = i;
-            result.extend(self.query_recursive(item, offsets, depth + 1));
-        }
+                for d in 0..N {
+                    target[d] += (k % 3) - 1;
+                    k /= 3;
+                }
 
-        return result;
+                self.grid.get(&target)
+            })
+            .flatten() 
     }
 }

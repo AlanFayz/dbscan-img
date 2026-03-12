@@ -1,4 +1,3 @@
-use std::{collections::{BTreeMap, HashSet, VecDeque}, time::Instant};
 
 use macroquad::prelude::*;
 
@@ -16,7 +15,7 @@ pub struct DbPoint {
 
 pub fn scan<const N: usize, T: Sample + Spatial<N> + Clone>(
     sample_points: &Vec<T>,
-    min_pts: i32,
+    min_pts: i64,
     eps: f32,
 ) -> Vec<DbPoint> {
     let mut points: Vec<DbPoint> = sample_points.iter().map(|_| Default::default()).collect();
@@ -25,43 +24,34 @@ pub fn scan<const N: usize, T: Sample + Spatial<N> + Clone>(
         grid.insert(point.clone(), i);
     }
 
-    //println!("Starting core query");
-    //let start = Instant::now();
     for i in 0..sample_points.len() {
-        //println!("{}%", i as f32 * 100.0 / points.len() as f32);
         let nearby_points = grid.query(&sample_points[i]);
-        if nearby_points.len() >= min_pts as usize {
+        let cnt = nearby_points.count();
+        if cnt >= min_pts as usize {
             points[i].is_core = true;
         }
     }
-    //println!("Finished core query, took {}s", start.elapsed().as_secs_f64());
 
-
-    //println!("Starting breadth first search");
-    //let start = Instant::now();
     let mut cluster_id = 1;
-    //let mut sm = 0;
+
+    let mut q: Vec<usize> = Vec::with_capacity(points.len());
+    let mut seen: Vec<bool> = vec![false; points.len()];
+
     for i in 0..points.len() {
-        match points[i].cluster_id {
-            Some(_) => continue,
-            _ => {}
-        };
+        if seen[i] {
+            continue;
+        }
+
+        seen[i] = true;
 
         if !points[i].is_core {
             continue;
         }
 
-        let mut q: VecDeque<usize> = VecDeque::new();
-        let mut seen: HashSet<usize> = HashSet::new();
-        q.push_front(i);
+        q.push(i);
+        seen[i] = true;
 
-        while !q.is_empty() {
-            let front = q.pop_back().unwrap();
-            seen.insert(front);
-
-            //println!("{}%", sm as f32 * 100.0 / points.len() as f32);
-            //sm += 1;
-
+        while let Some(front) = q.pop() {
             if !points[front].is_core {
                 continue;
             }
@@ -69,19 +59,14 @@ pub fn scan<const N: usize, T: Sample + Spatial<N> + Clone>(
             points[front].cluster_id = Some(cluster_id);
 
             let nearby_points = grid.query(&sample_points[front]);
-            for (_, idx) in &nearby_points {
-                match points[*idx].cluster_id {
-                    Some(_) => continue,
-                    _ => {}
-                };
-
-                if !seen.contains(idx)
+            for (_, idx) in nearby_points {
+                if !seen[*idx]
                     && sample_points[*idx].distance_squared(&sample_points[front]) <= (eps * eps)
                 {
-                    seen.insert(*idx);
+                    seen[*idx] = true;
 
                     if points[*idx].is_core {
-                        q.push_front(*idx);
+                        q.push(*idx);
                     }
                 }
             }
@@ -89,8 +74,6 @@ pub fn scan<const N: usize, T: Sample + Spatial<N> + Clone>(
 
         cluster_id += 1;
     }
-
-    //println!("Finished breadth first search, took {}s", start.elapsed().as_secs_f64());
 
     return points;
 }

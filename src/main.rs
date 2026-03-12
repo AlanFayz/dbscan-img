@@ -1,7 +1,6 @@
-use std::{
-    collections::HashMap,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, 
+    time::{SystemTime, UNIX_EPOCH}}
+;
 
 use macroquad::prelude::*;
 
@@ -34,7 +33,7 @@ fn generate_test_data() -> Vec<SamplePoint> {
 
     let gap = 100.0;
 
-    for _ in 0..500_000 {
+    for _ in 0..500 {
         points.push(SamplePoint {
             position: vec2(
                 rand::gen_range(10.0, center_x - gap),
@@ -43,7 +42,7 @@ fn generate_test_data() -> Vec<SamplePoint> {
         });
     }
 
-    for _ in 0..500_000 {
+    for _ in 0..500 {
         points.push(SamplePoint {
             position: vec2(
                 rand::gen_range(center_x + gap, screen_width() - 10.0),
@@ -70,31 +69,28 @@ async fn main() {
 
     let sample_points = generate_test_data();
 
-    println!("Starting scanning now");
-    let start = Instant::now();
-    let _ = scan(&sample_points, 5, 10.0);
-    println!("Scanning took {}s", start.elapsed().as_secs_f64());
+    let points = scan(&sample_points, 5, 12.0);
 
-    // let mut colors: HashMap<_, Color> = HashMap::new();
-    // for i in 0..points.len() {
-    //     match points[i].cluster_id {
-    //         Some(i) => _ = colors.entry(i).or_insert(Color::from_hex(rand::rand())),
-    //         None => {}
-    //     };
-    // }
+    let mut colors: HashMap<_, Color> = HashMap::new();
+    for i in 0..points.len() {
+        match points[i].cluster_id {
+            Some(i) => _ = colors.entry(i).or_insert(Color::from_hex(rand::rand())),
+            None => {}
+        };
+    }
 
-    // loop {
-    //     clear_background(WHITE);
+    loop {
+        clear_background(WHITE);
 
-    //     for (sample_point, point) in sample_points.iter().zip(points.iter()) {
-    //         let color = point
-    //             .cluster_id
-    //             .map(|i| colors.get(&i).unwrap().clone())
-    //             .unwrap_or(BLACK);
+        for (sample_point, point) in sample_points.iter().zip(points.iter()) {
+            let color = point
+                .cluster_id
+                .map(|i| colors.get(&i).unwrap().clone())
+                .unwrap_or(BLACK);
 
-    //         draw_circle(sample_point.position.x, sample_point.position.y, 5.0, color);
-    //     }
+            draw_circle(sample_point.position.x, sample_point.position.y, 5.0, color);
+        }
 
-    //     next_frame().await
-    // }
+        next_frame().await
+    }
 }
